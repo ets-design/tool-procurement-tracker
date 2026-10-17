@@ -81,12 +81,20 @@ def get_gspread_client():
         "https://www.googleapis.com/auth/drive"
     ]
     if "gcp_service_account" in st.secrets:
-        creds_dict = dict(st.secrets["gcp_service_account"])
+        raw_secret = st.secrets["gcp_service_account"]
+        if isinstance(raw_secret, str):
+            creds_dict = json.loads(raw_secret, strict=False)
+        else:
+            creds_dict = dict(raw_secret)
     elif os.environ.get("GCP_SERVICE_ACCOUNT_JSON"):
-        creds_dict = json.loads(os.environ["GCP_SERVICE_ACCOUNT_JSON"])
+        creds_dict = json.loads(os.environ["GCP_SERVICE_ACCOUNT_JSON"], strict=False)
     else:
         st.error("Missing Google Cloud credentials! Add `gcp_service_account` to Streamlit Secrets.")
         st.stop()
+
+    # Repair escaped newlines in private_key if mangled by TOML
+    if "private_key" in creds_dict:
+        creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
 
     creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
     return gspread.authorize(creds)
